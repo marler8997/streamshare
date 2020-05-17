@@ -1,0 +1,54 @@
+<html><head>
+<style type="text/css">
+* {margin:0;padding:0}
+#StageDiv{
+  text-align:center;
+}
+#StageContentDiv{
+  display:inline-block;
+}
+</style>      
+<script>
+function get(id) { return document.getElementById(id); }
+
+function onYoutubeVideoSubmit() {
+  let form = document.forms["YoutubeVideoForm"];
+  let v = form["YoutubeVideoInput"].value;
+
+  let request = new XMLHttpRequest();
+  request.open('GET', 'event?type=youtube&v=' + v)
+  //request.responseType = 'json';
+  request.onreadystatechange = function() {
+    if (request.readyState == XMLHttpRequest.DONE) {
+      let status = request.status;
+      if (status == 0 || (status >= 200 && status < 400)) {
+        console.log("response: " + request.responseText);
+      } else {
+        get('ErrorDiv').innerHTML = 'Error: failed to connect to server "' + globalHost + '": ' + request.statusText;
+      }
+    } else {
+      console.log('state change');
+    }
+  };
+  request.send();
+  return true;
+  
+}
+
+</script>
+</head><body>
+
+<div id="YoutubeVideoDiv">
+<br/><br/><br/>
+<div id="YoutubeVideoFormDiv">
+<form name="YoutubeVideoForm" onsubmit="onYoutubeVideoSubmit(); return false">
+  <label for="YoutubeVideoInput">YoutubeVideo: </label>
+  <input type="text" id="YoutubeVideoInput" name="YoutubeVideo" />
+  <input type="submit" value="Submit" />
+</form>
+</div>
+<br/><br/>
+<div id="ErrorDiv"></div>
+</div>
+    
+</body></html>

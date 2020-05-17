@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+import sys
+
+if sys.version_info[0] < 3:
+    sys.exit("Error: require python version >= 3 but got {}".format(sys.version))
+
+import os
+import time
+#import subprocess
+import threading
+import select
+import json
+import urllib.parse
+import http.server
+import html
+
+PING_TIMEOUT_SEC = 10
+
+global_event_connections = []
+
+def broadcast_event(event):
+    for conn in global_event_connections:
+        # TODO: handle write error
+        conn.send_event_msg(json.dumps(event))
+
+class Handler (http.server.BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+    is_events_connection = False
+
+    def handle(self):
+        try:
+            self.close_connection = True
+            self.handle_one_request()
+            while not self.close_connection:
+                if not self.is_events_connection:
+                    self.handle_one_request()
+                else:
+                    # wait for file to be readable
+                    #print("{}: waiting for data...".format(self.client_address))
+                    readable,_,_ = select.select([self.rfile], [], [], PING_TIMEOUT_SEC)
+                    if len(readable) > 0:
+                        self.handle_one_request()
+                    else:
+                        #msg = '{"type":"youtube","v":"zN9IrXQ5Yuk"}'
+                        #print("{}: sending '{}'".format(self.client_address, msg))
+                        #self.send_event_msg(msg)
+                        ping_msg = '{"type":"ping"}'
+                        self.send_event_msg(ping_msg)
+        finally:
+            if self.is_events_connection:
+                print("{}: events connection closed".format(self.client_address))
+                global_event_connections.remove(self)
+
+
+    def _send_html(self, code, message, add_debug_info=False):
+        debug_info = ""
+        if add_debug_info:
+            debug_info = "<pre>vars(self) = {}</pre>".format(html.escape(str(vars(self))))
+        response = "<html><title>Error {}</title><body>{}{}</body></html>".format(code, message, debug_info).encode('utf8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'text/html')
+        self.send_header('Content-Length', len(response))
+        self.end_headers()
+        self.wfile.write(response)
+
+    def send_event_headers(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.end_headers()
+    def send_event_msg(self, data):
+        response = ("data: " + data + "\n\n").encode('utf8')
+        self.wfile.write(response)
+        self.wfile.flush() # is this necessary?
+
+
+    def do_GET(self):
+        parsed_url = urllib.parse.urlparse(self.path)
+        url_path = parsed_url.path.lstrip('/')
+        if url_path == "events":
+            self.is_events_connection = True
+            global_event_connections.append(self)
+            print("{}: new events connection".format(self.client_address))
+            self.send_event_headers()
+            return
+        if url_path == "event":
+            print("got event: {}".format(parsed_url))
+            event = dict(urllib.parse.parse_qsl(parsed_url.query))
+            print("  event={}".format(json.dumps(event)))
+            broadcast_event(event)
+            self.send_response(200)
+            self.send_header('Content-Length', 0)
+            self.end_headers()
+            return
+
+        if len(url_path) == 0:
+            url_path = "client.html"
+        file_path = "webroot/" + url_path
+
+        content_type = None
+        try:
+            # TODO: should I use mmap?
+            with open(file_path, "rb") as file:
+                content = file.read()
+        except FileNotFoundError:
+            self._send_html(404, "path '{}' is not found".format(url_path), False)
+            return
+
+        self.send_response(200)
+        self.send_header('Content-Length', len(content))
+        if content_type:
+            self.send_header('Content-Type', content_type)
+        elif url_path.endswith(".html"):
+            self.send_header('Content-Type', 'text/html')
+        elif url_path.endswith(".js"):
+            self.send_header('Content-Type', 'text/javascript')
+        elif url_path.endswith(".css"):
+            self.send_header('Content-Type', 'text/css')
+        self.end_headers()
+        self.wfile.write(content)
+
+def handle_request(server):
+    print("thread {} waiting for client...".format(threading.get_ident()))
+    server.handle_request()
+
+class HttpThread(threading.Thread):
+    def __init__(self, server):
+        threading.Thread.__init__(self)
+        self.server = server
+    def run(self):
+        handle_request(self.server)
+
+class MultiThreadedHTTPServer(http.server.HTTPServer):
+    def process_request(self, request, client_address):
+        # start a new thread
+        new_thread = HttpThread(self)
+        new_thread.start()
+        http.server.HTTPServer.process_request(self, request, client_address)
+
+server_address = ('0.0.0.0', 1564)
+server = MultiThreadedHTTPServer(server_address,  Handler)
+handle_request(server)

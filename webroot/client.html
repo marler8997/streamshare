@@ -1,0 +1,123 @@
+<html><head>
+<title>Stream Share</title>
+<style type="text/css">
+* {margin:0;padding:0}
+body {background:#000;color:#aaa;font-family:arial;}
+#EventSourceStatusDiv {
+  font-weight: bold;
+}
+#StageDiv{
+  text-align:center;
+}
+#StageContentDiv{
+  display:inline-block;
+}
+</style>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+function get(id) { return document.getElementById(id); }
+
+// this function is called by the youtube iframe api library
+function onYouTubeIframeAPIReady() {
+  console.log("onYoutubeIframeAPIReady");
+  onJavascriptReady();
+}
+
+var youtube = (function() {
+
+  function onReady(event) {
+    console.log("youtube.onReady, playing video");
+    event.target.playVideo();
+    // keep retrying play in case the tab lost focus
+    setTimeout(retryPlay, 1000, event.target);
+  }
+  function retryPlay(player) {
+    if (player.playing === 1) {
+        console.log("retryPlay: done");
+    } else {
+        console.log("retryPlay");
+        player.playVideo();
+        setTimeout(retryPlay, 1000, player);
+    }
+  }
+  function onStateChange(event) {
+    if (event.data == -1) {
+      console.log("youtube.onStateChange: -1 (unstarted)");
+    } else if (event.data == YT.PlayerState.BUFFERING) {
+      console.log("youtube.onStateChange: " + event.data + " (buffering)");
+    } else if (event.data == YT.PlayerState.PLAYING) {
+      console.log("youtube.onStateChange: " + event.data + " (playing)");
+      event.target.playing = 1;
+    } else {
+      console.log("youtube.onStateChange: " + event.data)
+    }
+  }
+
+return {
+
+  "player": null,
+  "playing":0,
+  "handleEvent": function handleYoutubeEvent(v) {
+    get('StageContentDiv').innerHTML = '<div id="YoutubePlayerDiv"></div>';
+    youtube.player = new YT.Player('YoutubePlayerDiv', {
+      height: '390',
+      width: '640',
+      videoId: v,
+      events: {
+        'onReady': onReady,
+        'onStateChange': onStateChange
+      }
+    });
+    console.log("youtube.player has been set");
+  }
+
+};
+
+})();
+
+
+// This is called once all javascript libraries have been loaded
+// currently the only library we are waiting for is the youtube iframe api
+function onJavascriptReady() {
+  get('EventSourceStatusSpan').innerHTML = 'Connecting...';
+  const events = new EventSource("events");
+  events.onopen = function(event) {
+    console.log("EventSource: connected");
+    get('EventSourceStatusSpan').innerHTML = '<span style="color:#0a0">Connected</span>';
+  }
+  events.onerror = function(err) {
+    console.log("EventSource: error");
+    get('EventSourceStatusSpan').innerHTML = '<span style="color:#a00">Disconnected</span>';
+  }
+  events.onmessage = function(event) {
+    let eventData = JSON.parse(event.data);
+    if (eventData.type == 'ping') {
+      console.log("got ping");
+    } else if (eventData.type == 'youtube') {
+      console.log("youtube v=" + eventData.v);
+      youtube.handleEvent(eventData.v);
+    } else {
+      console.log("unknown event type: " + eventData.type);
+    }
+  }
+}
+
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</head><body>
+<br/>
+<h1 style="text-align:center">Stream Share</h1>
+
+<div id="EventSourceStatusDiv" style="text-align:center">
+  <span id="EventSourceStatusSpan">Loading...</span>
+</div>
+
+<div id="StageDiv">
+  <div id="StageContentDiv">
+  </div>
+</div>
+
+<!-- if the page is in a separate tab, and another tab is selected, then this page will stop functioning -->
+<div style="border:1px solid #aaa;margin:20px auto;padding:3px;text-align:center;width:450px"><h3>WARNING:</h3>Keep this page in its own Window, not in a tab with other pages.</div>
+
+</body></html>
