@@ -6,10 +6,11 @@ Uses python to create a web server that clients can connect to and receive event
 
 # Setup the server
 
-* open port 1564 on your server's firewall
-* if you're in a private network, forward port 1564 to your server
-* run `./server` on your server, uses python3 and logs to stdout
+* open the listen port (default is 80) on your server's firewall
+* if you're in a private network, forward the port you've chosen to your server
+* run `./streamshare [--port PORT]` on your server, uses python3 and logs to stdout
 
+> NOTE: if your port is < 1024, you will likely need to run `sudo ./streamshare ...` or you will get a `Permission denied` error in `server_bind`.
 > NOTE: I've seen issues with YouTube when clients connect to the server via an IP address instead of a host name.  It will sometimes say "Video Not Available".  I'm not sure why this happens, it's weird.  However, I have not seen this issue since I started using the iframe_api so it may not be an issue any longer, not sure.
 
 # Clients
