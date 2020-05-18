@@ -22,6 +22,7 @@ Once the server is started, clients can connect to it via their webrowser.  The 
 * support simple chat messages?
 * allow controller to copy/paste full video links (not just youtube video id)
 * allow controller to specify timestamp
+* allow controller to modify volumen, client should be able to specify a volume multipler
 
 # Issues
 
