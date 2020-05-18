@@ -15,15 +15,15 @@ Uses python to create a web server that clients can connect to and receive event
 
 # Clients
 
-Once the server is started, clients can connect to it via their webrowser.  The default page will serve up a page for a client that receives stream events.  Connect to the `controller.html` page to be able to send streaming events to others.
+Once the server is started, clients can connect to it via their webrowser.  The default page will serve up a page for a client that receives stream events.  Connect to the `SERVER/admin` page to be able to send streaming events to others.
 
 # Feature Ideas
 
-* have streaming clients report back their status, their timestamp, play/pause, volume, connected.  This data can be aggregated and sent to the controller page so they can see what's going on.
+* have streaming clients report back their status, their timestamp, play/pause, volume, connected.  This data can be aggregated and sent to the admin page so they can see what's going on.
 * support simple chat messages?
-* allow controller to copy/paste full video links (not just youtube video id)
-* allow controller to specify timestamp
-* allow controller to modify volumen, client should be able to specify a volume multipler
+* allow admin to copy/paste full video links (not just youtube video id)
+* allow admin to specify timestamp
+* allow admin to modify volumen, client should be able to specify a volume multipler
 
 # Issues
 
