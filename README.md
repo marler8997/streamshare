@@ -20,6 +20,8 @@ Once the server is started, clients can connect to it via their webrowser.  The 
 
 * have streaming clients report back their status, their timestamp, play/pause, volume, connected.  This data can be aggregated and sent to the controller page so they can see what's going on.
 * support simple chat messages?
+* allow controller to copy/paste full video links (not just youtube video id)
+* allow controller to specify timestamp
 
 # Issues
 
