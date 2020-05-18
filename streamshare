@@ -97,6 +97,8 @@ class Handler (http.server.BaseHTTPRequestHandler):
 
         if len(url_path) == 0:
             url_path = "client.html"
+        if url_path == "admin":
+            url_path = "admin.html"
         file_path = "webroot/" + url_path
 
         content_type = None
