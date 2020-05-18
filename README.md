@@ -11,7 +11,9 @@ Uses python to create a web server that clients can connect to and receive event
 * run `./streamshare [--port PORT]` on your server, uses python3 and logs to stdout
 
 > NOTE: if your port is < 1024, you will likely need to run `sudo ./streamshare ...` or you will get a `Permission denied` error in `server_bind`.
+
 > NOTE: I've seen issues with YouTube when clients connect to the server via an IP address instead of a host name.  It will sometimes say "Video Not Available".  I'm not sure why this happens, it's weird.  However, I have not seen this issue since I started using the iframe_api so it may not be an issue any longer, not sure.
+
 > NOTE: in case I want the server to host multiple programs on port 80, I should create a simple http multiplexer program that can forward data to different programs on different ports
 
 # Clients
