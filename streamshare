@@ -30,7 +30,7 @@ class Shared:
         return self.current_event_json != None
     def make_event_msg(self):
         seconds_since = (datetime.datetime.now() - self.current_event_time).total_seconds()
-        return '{{"secondssince":{},"event":{}}}'.format(seconds_since, self.current_event_json)
+        return '{{"seconds_since":{},"data":{}}}'.format(seconds_since, self.current_event_json)
 
 shared = Shared()
 
@@ -58,7 +58,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
                     if len(readable) > 0:
                         self.handle_one_request()
                     else:
-                        ping_msg = '{"secondssince":0,"event":{"type":"ping"}}'
+                        ping_msg = '{"seconds_since":0,"data":{"type":"ping"}}'
                         self.send_event_msg(ping_msg)
         finally:
             if self.is_events_connection:

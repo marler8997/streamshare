@@ -12,10 +12,18 @@ body {background:#000;color:#aaa;font-family:arial;}
 #StageContentDiv{
   display:inline-block;
 }
+#YoutubePlayerDiv{display:inline-block}
 </style>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 function get(id) { return document.getElementById(id); }
+
+function assert(cond, msg) {
+  if (!cond) {
+    alert('CODEBUG: assert failed: ' + msg);
+    throw msg;
+  }
+}
 
 // this function is called by the youtube iframe api library
 function onYouTubeIframeAPIReady() {
@@ -25,20 +33,37 @@ function onYouTubeIframeAPIReady() {
 
 var youtube = (function() {
 
-  function onReady(event) {
-    console.log("youtube.onReady, playing video");
-    event.target.playVideo();
-    // keep retrying play in case the tab lost focus
-    setTimeout(retryPlay, 1000, event.target);
-  }
-  function retryPlay(player) {
-    if (player.playing === 1) {
-        console.log("retryPlay: done");
-    } else {
-        console.log("retryPlay");
-        player.playVideo();
-        setTimeout(retryPlay, 1000, player);
+
+  function loadVideo() {
+    let start = 0;
+    let event = youtube.current.event;
+    if (event.seconds_since > 10) {
+        start = Math.floor(event.seconds_since);
     }
+    youtube.playing = 0;
+    console.log("youtube v=" + event.data.v + " start=" + start);
+    youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
+    setTimeout(retryPlay, 1000, event);
+  }
+  function retryPlay(event) {
+    if (event !== youtube.current.event)
+      return;
+    if (youtube.current.playing === 1) {
+      console.log("retryPlay: done");
+    } else {
+      //youtube.current.playAttempt += 1;
+      console.log("retryPlay attempt=" + youtube.current.playAttempt);
+      youtube._player.playVideo();
+      setTimeout(retryPlay, 1000, event);
+    }
+  }
+  function onReady(event) {
+    console.log("onready playerRead=" + youtube._playerReady);
+    assert(!youtube._playerReady, "youtube.onReady called but already ready");
+    assert(youtube.current.event != null, "youtube.onReady called but no current event")
+    youtube._playerReady = true;
+    console.log("player ready!");
+    loadVideo();
   }
   function onStateChange(event) {
     if (event.data == -1) {
@@ -47,36 +72,40 @@ var youtube = (function() {
       console.log("youtube.onStateChange: " + event.data + " (buffering)");
     } else if (event.data == YT.PlayerState.PLAYING) {
       console.log("youtube.onStateChange: " + event.data + " (playing)");
-      event.target.playing = 1;
+      youtube.current.playing = 1;
     } else {
       console.log("youtube.onStateChange: " + event.data)
     }
   }
 
+
 return {
 
-  "player": null,
-  "playing":0,
-  "handleEvent": function handleYoutubeEvent(v, secondsSince) {
-    let start = 0;
-    if (secondsSince > 10) {
-        start = Math.floor(secondsSince);
+  "_player":null,
+  "_playerReady":false,
+  "current": null,
+
+  "handleEvent": function handleYoutubeEvent(event) {
+    console.log("youtube v=" + event.data.v);
+    youtube.current = {'event':event,'playing':0};
+
+    if (youtube._playerReady) {
+      assert(youtube._player !== null, "youtube player ready but is null");
+      loadVideo();
+      return;
     }
-    console.log("[DEBUG] start=" + start);
-    get('StageContentDiv').innerHTML = '<div id="YoutubePlayerDiv"></div>';
-    youtube.player = new YT.Player('YoutubePlayerDiv', {
-      'height': '390',
-      'width': '640',
-      'videoId': v,
-      'events': {
-        'onReady': onReady,
-        'onStateChange': onStateChange
-      },
-      'playerVars': {
-        'start':start
-      }
-    });
-    console.log("youtube.player has been set");
+    // could be non-null because multiple events could come in before player is ready
+    if (youtube._player === null) {
+      youtube._player = new YT.Player('YoutubePlayerDiv', {
+        'height': '390',
+        'width': '640',
+        'events': {
+          'onReady': onReady,
+          'onStateChange': onStateChange
+        },
+        'playerVars':{'autoplay':1}
+        });
+    }
   }
 
 };
@@ -97,16 +126,14 @@ function onJavascriptReady() {
     console.log("EventSource: error");
     get('EventSourceStatusSpan').innerHTML = '<span style="color:#a00">Disconnected</span>';
   }
-  events.onmessage = function(event) {
-    let eventData = JSON.parse(event.data);
-    secondsSince = eventData.secondssince;
-    if (eventData.event.type == 'ping') {
+  events.onmessage = function(eventObj) {
+    let event = JSON.parse(eventObj.data);
+    if (event.data.type == 'ping') {
       console.log("got ping");
-    } else if (eventData.event.type == 'youtube') {
-      console.log("youtube v=" + eventData.event.v);
-      youtube.handleEvent(eventData.event.v, secondsSince);
+    } else if (event.data.type == 'youtube') {
+      youtube.handleEvent(event);
     } else {
-      console.log("unknown event type: " + eventData.event.type);
+      console.log("unknown event type: " + event.data.type);
     }
   }
 }
@@ -124,6 +151,7 @@ function onJavascriptReady() {
 <div id="StageDiv">
   <div id="StageContentDiv">
   </div>
+  <div id="YoutubePlayerDiv"></div>
 </div>
 
 <!-- if the page is in a separate tab, and another tab is selected, then this page will stop functioning -->
