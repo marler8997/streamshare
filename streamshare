@@ -6,6 +6,7 @@ if sys.version_info[0] < 3:
     sys.exit("Error: require python version >= 3 but got {}".format(sys.version))
 
 import time
+import datetime
 import argparse
 #import subprocess
 import threading
@@ -17,12 +18,27 @@ import html
 
 PING_TIMEOUT_SEC = 10
 
-global_event_connections = []
+class Shared:
+    def __init__(self):
+        self.event_connections = []
+        self.current_event_json = None
+        self.current_event_time = None
+    def set_event(self, event_json, event_time):
+        self.current_event_json = event_json
+        self.current_event_time = event_time
+    def have_event(self):
+        return self.current_event_json != None
+    def make_event_msg(self):
+        seconds_since = (datetime.datetime.now() - self.current_event_time).total_seconds()
+        return '{{"secondssince":{},"event":{}}}'.format(seconds_since, self.current_event_json)
+
+shared = Shared()
 
 def broadcast_event(event):
-    for conn in global_event_connections:
-        # TODO: handle write error
-        conn.send_event_msg(json.dumps(event))
+    shared.set_event(json.dumps(event), datetime.datetime.now())
+    msg = shared.make_event_msg()
+    for conn in shared.event_connections:
+        conn.send_event_msg(msg)
 
 class Handler (http.server.BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
@@ -42,15 +58,12 @@ class Handler (http.server.BaseHTTPRequestHandler):
                     if len(readable) > 0:
                         self.handle_one_request()
                     else:
-                        #msg = '{"type":"youtube","v":"zN9IrXQ5Yuk"}'
-                        #print("{}: sending '{}'".format(self.client_address, msg))
-                        #self.send_event_msg(msg)
-                        ping_msg = '{"type":"ping"}'
+                        ping_msg = '{"secondssince":0,"event":{"type":"ping"}}'
                         self.send_event_msg(ping_msg)
         finally:
             if self.is_events_connection:
                 print("{}: events connection closed".format(self.client_address))
-                global_event_connections.remove(self)
+                shared.event_connections.remove(self)
 
 
     def _send_html(self, code, message, add_debug_info=False):
@@ -81,9 +94,11 @@ class Handler (http.server.BaseHTTPRequestHandler):
         url_path = parsed_url.path.lstrip('/')
         if url_path == "events":
             self.is_events_connection = True
-            global_event_connections.append(self)
+            shared.event_connections.append(self)
             print("{}: new events connection".format(self.client_address))
             self.send_event_headers()
+            if shared.have_event():
+                self.send_event_msg(shared.make_event_msg())
             return
         if url_path == "event":
             print("got event: {}".format(parsed_url))

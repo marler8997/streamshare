@@ -57,15 +57,23 @@ return {
 
   "player": null,
   "playing":0,
-  "handleEvent": function handleYoutubeEvent(v) {
+  "handleEvent": function handleYoutubeEvent(v, secondsSince) {
+    let start = 0;
+    if (secondsSince > 10) {
+        start = Math.floor(secondsSince);
+    }
+    console.log("[DEBUG] start=" + start);
     get('StageContentDiv').innerHTML = '<div id="YoutubePlayerDiv"></div>';
     youtube.player = new YT.Player('YoutubePlayerDiv', {
-      height: '390',
-      width: '640',
-      videoId: v,
-      events: {
+      'height': '390',
+      'width': '640',
+      'videoId': v,
+      'events': {
         'onReady': onReady,
         'onStateChange': onStateChange
+      },
+      'playerVars': {
+        'start':start
       }
     });
     console.log("youtube.player has been set");
@@ -91,13 +99,14 @@ function onJavascriptReady() {
   }
   events.onmessage = function(event) {
     let eventData = JSON.parse(event.data);
-    if (eventData.type == 'ping') {
+    secondsSince = eventData.secondssince;
+    if (eventData.event.type == 'ping') {
       console.log("got ping");
-    } else if (eventData.type == 'youtube') {
-      console.log("youtube v=" + eventData.v);
-      youtube.handleEvent(eventData.v);
+    } else if (eventData.event.type == 'youtube') {
+      console.log("youtube v=" + eventData.event.v);
+      youtube.handleEvent(eventData.event.v, secondsSince);
     } else {
-      console.log("unknown event type: " + eventData.type);
+      console.log("unknown event type: " + eventData.event.type);
     }
   }
 }
