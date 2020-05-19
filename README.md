@@ -22,7 +22,6 @@ Once the server is started, clients can connect to it via their webrowser.  The 
 
 # Feature Ideas
 
-* keep global state of the stream on the server, and when new clients connect, send them the current video/timestamp.  Do do this correctly, when a client does connect to the events channel, it should send it's current state (video/timestamp)
 * have streaming clients report back their status, their timestamp, play/pause, volume, connected.  This data can be aggregated and sent to the admin page so they can see what's going on.
 * support simple chat messages?
 * allow admin to copy/paste full video links (not just youtube video id)
