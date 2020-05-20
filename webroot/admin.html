@@ -36,8 +36,8 @@ function onStopSubmit() {
 }
 function onYoutubeVideoSubmit() {
   let form = document.forms["YoutubeVideoForm"];
-  let v = form["YoutubeVideoInput"].value;
-  submitEvent('type=youtube&v=' + v);
+  let videoIdAndParams = form["YoutubeVideoInput"].value;
+  submitEvent('type=youtube&v=' + videoIdAndParams);
 }
 
 </script>
