@@ -75,6 +75,8 @@ class Handler (http.server.BaseHTTPRequestHandler):
                     else:
                         ping_msg = '{"millis_since":0,"data":{"type":"ping"}}'
                         self.send_event_msg(ping_msg)
+        except ConnectionResetError as conn_err:
+            print("{}: connection reset".format(self.client_address))
         finally:
             if self.connection_type == Handler.CONNECTION_TYPE_EVENTS:
                 print("{}: events connection closed".format(self.client_address))
