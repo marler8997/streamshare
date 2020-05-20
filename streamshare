@@ -5,6 +5,7 @@ import os
 if sys.version_info[0] < 3:
     sys.exit("Error: require python version >= 3 but got {}".format(sys.version))
 
+import math
 import time
 import datetime
 import argparse
@@ -15,6 +16,7 @@ import json
 import urllib.parse
 import http.server
 import html
+import socket
 
 PING_TIMEOUT_SEC = 10
 
@@ -29,27 +31,36 @@ class Shared:
     def have_event(self):
         return self.current_event_json != None
     def make_event_msg(self):
-        seconds_since = (datetime.datetime.now() - self.current_event_time).total_seconds()
-        return '{{"seconds_since":{},"data":{}}}'.format(seconds_since, self.current_event_json)
+        if self.have_event():
+            seconds_since = (datetime.datetime.now() - self.current_event_time).total_seconds()
+            return '{{"seconds_since":{},"data":{}}}'.format(math.floor(seconds_since), self.current_event_json)
+        else:
+            return '{"seconds_since":0,"data":{"type":"stop"}}'
 
 shared = Shared()
 
 def broadcast_event(event):
     shared.set_event(json.dumps(event), datetime.datetime.now())
     msg = shared.make_event_msg()
+    print("broadcasting: {}".format(msg))
     for conn in shared.event_connections:
         conn.send_event_msg(msg)
 
 class Handler (http.server.BaseHTTPRequestHandler):
+    CONNECTION_TYPE_NORMAL = 0
+    CONNECTION_TYPE_EVENTS = 1
+    CONNECTION_TYPE_ADMIN_EVENTS = 2
     protocol_version = 'HTTP/1.1'
-    is_events_connection = False
+    def __init__(self, *args, **kwargs):
+        self.connection_type = Handler.CONNECTION_TYPE_NORMAL
+        super().__init__(*args, **kwargs)
 
     def handle(self):
         try:
             self.close_connection = True
             self.handle_one_request()
             while not self.close_connection:
-                if not self.is_events_connection:
+                if self.connection_type == Handler.CONNECTION_TYPE_NORMAL:
                     self.handle_one_request()
                 else:
                     # wait for file to be readable
@@ -61,7 +72,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
                         ping_msg = '{"seconds_since":0,"data":{"type":"ping"}}'
                         self.send_event_msg(ping_msg)
         finally:
-            if self.is_events_connection:
+            if self.connection_type == Handler.CONNECTION_TYPE_EVENTS:
                 print("{}: events connection closed".format(self.client_address))
                 shared.event_connections.remove(self)
 
@@ -85,21 +96,30 @@ class Handler (http.server.BaseHTTPRequestHandler):
         self.end_headers()
     def send_event_msg(self, data):
         response = ("data: " + data + "\n\n").encode('utf8')
-        self.wfile.write(response)
-        self.wfile.flush() # is this necessary?
-
+        try:
+            self.wfile.write(response)
+            self.wfile.flush() # is this necessary?
+        except OSError as err:
+            print("{}: write failed: {}".format(self.client_address, err))
+            self.close_connection = True
+            # todo: maybe try something like this to pop the call to read rfile
+            #print("!!!!!!!!!!!!!!!!!!!! addr={}".format(self.client_address))
+            #self.rfile.fileno().shutdown(socket.SHUT_RDWR)
 
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
         url_path = parsed_url.path.lstrip('/')
         if url_path == "events":
-            self.is_events_connection = True
             shared.event_connections.append(self)
+            self.connection_type = Handler.CONNECTION_TYPE_EVENTS
             print("{}: new events connection".format(self.client_address))
             self.send_event_headers()
-            if shared.have_event():
-                self.send_event_msg(shared.make_event_msg())
+            msg = shared.make_event_msg()
+            print("{}: sending {}".format(self.client_address, msg))
+            self.send_event_msg(msg)
             return
+        #if url_path == "adminevents":
+        #    !!!
         if url_path == "event":
             print("got event: {}".format(parsed_url))
             event = dict(urllib.parse.parse_qsl(parsed_url.query))

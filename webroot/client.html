@@ -6,23 +6,31 @@ body {background:#000;color:#aaa;font-family:arial;}
 #EventSourceStatusDiv {
   font-weight: bold;
 }
+#ErrorDiv{
+  color:#a00;
+  margin:0 20px;
+  text-align:center;
+}
 #StageDiv{
   text-align:center;
 }
 #StageContentDiv{
   display:inline-block;
 }
-#YoutubePlayerDiv{display:inline-block}
+#YoutubePlayerDiv{display:none}
 </style>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 function get(id) { return document.getElementById(id); }
 
+function panic(msg) {
+  let msgDiv = document.createElement('div');
+  msgDiv.innerHTML = '<pre>Error: ' + msg + '</pre>';
+  get('ErrorDiv').appendChild(msgDiv);
+  throw msg;
+}
 function assert(cond, msg) {
-  if (!cond) {
-    alert('CODEBUG: assert failed: ' + msg);
-    throw msg;
-  }
+  if (!cond) panic(msg);
 }
 
 // this function is called by the youtube iframe api library
@@ -31,17 +39,20 @@ function onYouTubeIframeAPIReady() {
   onJavascriptReady();
 }
 
+var currentEventHandler = null;
+
 var youtube = (function() {
-
-
   function loadVideo() {
+    assert(youtube.current.event != null);
+    get('YoutubePlayerDiv').style.display = 'inline-block';
     let start = 0;
     let event = youtube.current.event;
     if (event.seconds_since > 10) {
         start = Math.floor(event.seconds_since);
     }
     console.log("youtube v=" + event.data.v + " start=" + start);
-    youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
+    //youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
+    youtube._player.loadVideoById(event.data.v, start);
     setTimeout(retryPlay, 1000, event);
   }
   function retryPlay(event) {
@@ -50,20 +61,21 @@ var youtube = (function() {
     if (youtube._player.getPlayerState() == YT.PlayerState.PLAYING) {
       console.log("retryPlay: done");
     } else {
-      //youtube.current.playAttempt += 1;
-      console.log("retryPlay attempt=" + youtube.current.playAttempt);
+      console.log("retryPlay");
       youtube._player.playVideo();
       setTimeout(retryPlay, 1000, event);
     }
   }
   function onReady(event) {
-    console.log("onready playerRead=" + youtube._playerReady);
+    console.log("youtube.onReady");
     assert(!youtube._playerReady, "youtube.onReady called but already ready");
-    assert(youtube.current.event != null, "youtube.onReady called but no current event")
     youtube._playerReady = true;
-    console.log("player ready!");
-    loadVideo();
+    // event could be null if another type of event was loaded before the player became ready
+    if (youtube.current.event != null) {
+      loadVideo();
+    }
   }
+  // for now this is just for debug logging
   function onStateChange(event) {
     if (event.data == -1) {
       console.log("youtube.onStateChange: -1 (unstarted)");
@@ -83,6 +95,14 @@ return {
   "_playerReady":false,
   "current": null,
 
+  "disable": function disableYoutube(event) {
+    if (youtube._playerReady) {
+      assert(youtube._player !== null, "youtube player ready but is null");
+      youtube._player.stopVideo();
+    }
+    youtube.current = null;
+    get('YoutubePlayerDiv').style.display = 'none';
+  },
   "handleEvent": function handleYoutubeEvent(event) {
     console.log("youtube v=" + event.data.v);
     youtube.current = {'event':event};
@@ -110,6 +130,17 @@ return {
 
 })();
 
+var stopHandler = (function() {
+return {
+  "disable": function stopHandlerDisable() {
+    // do nothing
+  },
+  "handleEvent": function stopHandlerHandleEvent(event) {
+    // do nothing
+  }
+};
+
+})();
 
 // This is called once all javascript libraries have been loaded
 // currently the only library we are waiting for is the youtube iframe api
@@ -128,11 +159,25 @@ function onJavascriptReady() {
     let event = JSON.parse(eventObj.data);
     if (event.data.type == 'ping') {
       console.log("got ping");
-    } else if (event.data.type == 'youtube') {
-      youtube.handleEvent(event);
-    } else {
-      console.log("unknown event type: " + event.data.type);
+      return;
     }
+
+    let newEventHandler = null;
+    if (event.data.type == 'stop') {
+      newEventHandler = stopHandler;
+    } else if (event.data.type == 'youtube') {
+      newEventHandler = youtube;
+    } else {
+      panic("unknown event type: " + event.data.type);
+    }
+
+    if (currentEventHandler !== newEventHandler) {
+      if (currentEventHandler) {
+        currentEventHandler.disable();
+      }
+      currentEventHandler = newEventHandler;
+    }
+    currentEventHandler.handleEvent(event);
   }
 }
 
@@ -146,6 +191,7 @@ function onJavascriptReady() {
   <span id="EventSourceStatusSpan">Loading...</span>
 </div>
 
+<div id="ErrorDiv"></div>
 <div id="StageDiv">
   <div id="StageContentDiv">
   </div>
