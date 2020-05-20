@@ -57,6 +57,14 @@ var youtube = (function() {
     let millisSinceEventReceived = Date.now() - youtube.current.receivedTimestamp;
     let playTime = youtube._player.getCurrentTime();
     let seekValue = youtube.current.startSeconds + (youtube.current.event.millis_since + millisSinceEventReceived) / 1000;
+    let videoDuration = youtube._player.getDuration();
+    if (videoDuration == 0) {
+      console.log("video duration: unknown");
+    } else {
+      let newSeekValue = seekValue % videoDuration;
+      console.log("video duration: " + videoDuration + " seek " + seekValue + " > " + newSeekValue);
+      seekValue = newSeekValue;
+    }
     console.log("[DEBUG] playTime=" + playTime + ", seekValue=" + seekValue);
     let offset = Math.abs(seekValue - playTime);
     if (offset > threshold) {
@@ -98,6 +106,8 @@ var youtube = (function() {
     console.log("youtube.onReady");
     assert(!youtube._playerReady, "youtube.onReady called but already ready");
     youtube._playerReady = true;
+    // this doesn't seem to work, so I've also added a seek when the "ended" event is fired
+    youtube._player.setLoop(true);
     // event could be null if another type of event was loaded before the player became ready
     if (youtube.current.event != null) {
       loadVideo();
@@ -106,6 +116,10 @@ var youtube = (function() {
   function onStateChange(event) {
     if (event.data == -1) {
       console.log("youtube.onStateChange: -1 (unstarted)");
+    } else if (event.data == YT.PlayerState.ENDED) {
+      // loop doesn't seem to work but this should
+      console.log("youtube.onStateChange: " + event.data + " (ended)");
+      seek(0);
     } else if (event.data == YT.PlayerState.CUED) {
       console.log("youtube.onStateChange: " + event.data + " (cued)");
     } else if (event.data == YT.PlayerState.BUFFERING) {
@@ -158,7 +172,7 @@ return {
           'onReady': onReady,
           'onStateChange': onStateChange
         },
-        'playerVars':{'autoplay':1}
+        'playerVars':{'autoplay':1,'loop':1}
         });
     }
   }
