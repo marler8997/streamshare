@@ -20,6 +20,9 @@ import socket
 
 PING_TIMEOUT_SEC = 10
 
+def now_millis():
+    return time.time_ns() / 1000000
+
 class Shared:
     def __init__(self):
         self.event_connections = []
@@ -32,15 +35,15 @@ class Shared:
         return self.current_event_json != None
     def make_event_msg(self):
         if self.have_event():
-            seconds_since = (datetime.datetime.now() - self.current_event_time).total_seconds()
-            return '{{"seconds_since":{},"data":{}}}'.format(math.floor(seconds_since), self.current_event_json)
+            millis_since = now_millis() - self.current_event_time
+            return '{{"millis_since":{},"data":{}}}'.format(math.floor(millis_since), self.current_event_json)
         else:
-            return '{"seconds_since":0,"data":{"type":"stop"}}'
+            return '{"millis_since":0,"data":{"type":"stop"}}'
 
 shared = Shared()
 
 def broadcast_event(event):
-    shared.set_event(json.dumps(event), datetime.datetime.now())
+    shared.set_event(json.dumps(event), now_millis())
     msg = shared.make_event_msg()
     print("broadcasting: {}".format(msg))
     for conn in shared.event_connections:
@@ -69,7 +72,7 @@ class Handler (http.server.BaseHTTPRequestHandler):
                     if len(readable) > 0:
                         self.handle_one_request()
                     else:
-                        ping_msg = '{"seconds_since":0,"data":{"type":"ping"}}'
+                        ping_msg = '{"millis_since":0,"data":{"type":"ping"}}'
                         self.send_event_msg(ping_msg)
         finally:
             if self.connection_type == Handler.CONNECTION_TYPE_EVENTS:

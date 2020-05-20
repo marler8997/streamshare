@@ -42,28 +42,35 @@ function onYouTubeIframeAPIReady() {
 var currentEventHandler = null;
 
 var youtube = (function() {
+  function seek(threshold) {
+    let millisSinceEventReceived = Date.now() - youtube.current.start;
+    let playTime = youtube._player.getCurrentTime();
+    let seekValue = (youtube.current.event.millis_since + millisSinceEventReceived) / 1000;
+    console.log("[DEBUG] playTime=" + playTime + ", seekValue=" + seekValue);
+    let offset = Math.abs(seekValue - playTime);
+    if (offset > threshold) {
+      console.log("seeking to " + seekValue + " (offset=" + offset + ")");
+      youtube._player.seekTo(seekValue);
+    } else {
+      console.log("video offset=" + offset + " is within threshold " + threshold);
+    }
+  }
   function loadVideo() {
     assert(youtube.current.event != null);
     get('YoutubePlayerDiv').style.display = 'inline-block';
-    let start = 0;
     let event = youtube.current.event;
-    if (event.seconds_since > 10) {
-        start = Math.floor(event.seconds_since);
+    if (youtube.currentVideoId == event.data.v) {
+      console.log("reloading same video...");
+      seek(0);
+    } else {
+      youtube._player.loadVideoById(event.data.v, youtube.current.start);
+      youtube.currentVideoId = event.data.v;
+      // seeking doesn't seem to work here, so it should be done in onStateChange
     }
-    console.log("youtube v=" + event.data.v + " start=" + start);
 
-    //
-    // for some reason, loadVideoById doesn't work.  If a video is loaded that was previously
-    // playing, then the startSeconds parameter is ignored
-    //
-    //youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
-    //youtube._player.loadVideoById(event.data.v, start);
-    youtube._player.cueVideoById(event.data.v, start);
-    youtube._player.seekTo(start);
-    youtube._player.playVideo();
-
-    setTimeout(retryPlay, 1000, event);
+    //setTimeout(retryPlay, 1000, event);
   }
+  /*
   function retryPlay(event) {
     if (event !== youtube.current.event)
       return;
@@ -71,10 +78,12 @@ var youtube = (function() {
       console.log("retryPlay: done");
     } else {
       console.log("retryPlay");
+      youtube._player.seekTo(youtube.current.start);
       youtube._player.playVideo();
       setTimeout(retryPlay, 1000, event);
     }
   }
+  */
   function onReady(event) {
     console.log("youtube.onReady");
     assert(!youtube._playerReady, "youtube.onReady called but already ready");
@@ -84,14 +93,18 @@ var youtube = (function() {
       loadVideo();
     }
   }
-  // for now this is just for debug logging
   function onStateChange(event) {
     if (event.data == -1) {
       console.log("youtube.onStateChange: -1 (unstarted)");
+    } else if (event.data == YT.PlayerState.CUED) {
+      console.log("youtube.onStateChange: " + event.data + " (cued)");
     } else if (event.data == YT.PlayerState.BUFFERING) {
       console.log("youtube.onStateChange: " + event.data + " (buffering)");
     } else if (event.data == YT.PlayerState.PLAYING) {
       console.log("youtube.onStateChange: " + event.data + " (playing)");
+      if (youtube.current.event != null) {
+        seek(3);
+      }
     } else {
       console.log("youtube.onStateChange: " + event.data)
     }
@@ -103,6 +116,7 @@ return {
   "_player":null,
   "_playerReady":false,
   "current": null,
+  "currentVideoId":null,
 
   "disable": function disableYoutube(event) {
     if (youtube._playerReady) {
@@ -113,7 +127,7 @@ return {
     get('YoutubePlayerDiv').style.display = 'none';
   },
   "handleEvent": function handleYoutubeEvent(event) {
-    youtube.current = {'event':event};
+    youtube.current = {'event':event,'start':Date.now()};
 
     if (youtube._playerReady) {
       assert(youtube._player !== null, "youtube player ready but is null");
