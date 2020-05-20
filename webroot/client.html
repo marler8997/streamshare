@@ -51,8 +51,17 @@ var youtube = (function() {
         start = Math.floor(event.seconds_since);
     }
     console.log("youtube v=" + event.data.v + " start=" + start);
+
+    //
+    // for some reason, loadVideoById doesn't work.  If a video is loaded that was previously
+    // playing, then the startSeconds parameter is ignored
+    //
     //youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
-    youtube._player.loadVideoById(event.data.v, start);
+    //youtube._player.loadVideoById(event.data.v, start);
+    youtube._player.cueVideoById(event.data.v, start);
+    youtube._player.seekTo(start);
+    youtube._player.playVideo();
+
     setTimeout(retryPlay, 1000, event);
   }
   function retryPlay(event) {
@@ -104,7 +113,6 @@ return {
     get('YoutubePlayerDiv').style.display = 'none';
   },
   "handleEvent": function handleYoutubeEvent(event) {
-    console.log("youtube v=" + event.data.v);
     youtube.current = {'event':event};
 
     if (youtube._playerReady) {
@@ -162,6 +170,7 @@ function onJavascriptReady() {
       return;
     }
 
+    console.log(eventObj.data);
     let newEventHandler = null;
     if (event.data.type == 'stop') {
       newEventHandler = stopHandler;
