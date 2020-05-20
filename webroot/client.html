@@ -40,7 +40,6 @@ var youtube = (function() {
     if (event.seconds_since > 10) {
         start = Math.floor(event.seconds_since);
     }
-    youtube.playing = 0;
     console.log("youtube v=" + event.data.v + " start=" + start);
     youtube._player.loadVideoById({'videoId':event.data.v,'startSeconds':start});
     setTimeout(retryPlay, 1000, event);
@@ -48,7 +47,7 @@ var youtube = (function() {
   function retryPlay(event) {
     if (event !== youtube.current.event)
       return;
-    if (youtube.current.playing === 1) {
+    if (youtube._player.getPlayerState() == YT.PlayerState.PLAYING) {
       console.log("retryPlay: done");
     } else {
       //youtube.current.playAttempt += 1;
@@ -72,7 +71,6 @@ var youtube = (function() {
       console.log("youtube.onStateChange: " + event.data + " (buffering)");
     } else if (event.data == YT.PlayerState.PLAYING) {
       console.log("youtube.onStateChange: " + event.data + " (playing)");
-      youtube.current.playing = 1;
     } else {
       console.log("youtube.onStateChange: " + event.data)
     }
@@ -87,7 +85,7 @@ return {
 
   "handleEvent": function handleYoutubeEvent(event) {
     console.log("youtube v=" + event.data.v);
-    youtube.current = {'event':event,'playing':0};
+    youtube.current = {'event':event};
 
     if (youtube._playerReady) {
       assert(youtube._player !== null, "youtube player ready but is null");
