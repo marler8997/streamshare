@@ -103,7 +103,7 @@ var youtube = (function() {
     } else if (event.data == YT.PlayerState.PLAYING) {
       console.log("youtube.onStateChange: " + event.data + " (playing)");
       if (youtube.current.event != null) {
-        seek(3);
+        seek(1);
       }
     } else {
       console.log("youtube.onStateChange: " + event.data)

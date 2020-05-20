@@ -44,9 +44,10 @@ shared = Shared()
 
 def broadcast_event(event):
     shared.set_event(json.dumps(event), now_millis())
-    msg = shared.make_event_msg()
-    print("broadcasting: {}".format(msg))
+    print("broadcasting: {}".format(shared.current_event_json))
     for conn in shared.event_connections:
+        # make a new message each time for an updated timestamp
+        msg = shared.make_event_msg()
         conn.send_event_msg(msg)
 
 class Handler (http.server.BaseHTTPRequestHandler):
