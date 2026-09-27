@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stream Share</title>
+<style>
+body { background: #000; color: #aaa; font-family: arial, sans-serif; margin: 20px; }
+h1 { text-align: center; }
+table { margin: 0 auto; border-collapse: collapse; }
+td { padding: 4px 12px; }
+.ok { color: #0a0; }
+.fail { color: #a00; }
+</style>
+</head>
+<body>
+<h1>Stream Share</h1>
+<p style="text-align:center">Test page: checks that this host provides what the app needs.</p>
+<table id="Checks"></table>
+<script type="module">
+const checks = [
+  ["secure context (https or localhost)", () => window.isSecureContext],
+  ["crypto.subtle", () => typeof crypto !== "undefined" && crypto.subtle !== undefined],
+  ["RTCPeerConnection", () => typeof RTCPeerConnection !== "undefined"],
+  ["localStorage", () => {
+    const key = "streamshare:test";
+    localStorage.setItem(key, "1");
+    const ok = localStorage.getItem(key) === "1";
+    localStorage.removeItem(key);
+    return ok;
+  }],
+];
+const table = document.getElementById("Checks");
+for (const [name, check] of checks) {
+  let result;
+  try {
+    result = check() ? "ok" : "fail";
+  } catch (err) {
+    result = "fail";
+    console.error(`check '${name}' threw`, err);
+  }
+  const row = table.insertRow();
+  row.insertCell().textContent = name;
+  const cell = row.insertCell();
+  cell.textContent = result;
+  cell.className = result;
+}
+</script>
+</body>
+</html>
